@@ -1,0 +1,62 @@
+# OpenClaw — Local / OpenAI-compatible LLM variant
+# ─────────────────────────────────────────────────────────────────────────────
+# Use this config if you're running a local model server (vLLM, Ollama, LM
+# Studio, llama.cpp, etc.) that exposes an OpenAI-compatible /v1 endpoint.
+#
+# Run with:
+#   aiq run --config_file src/openclaw/configs/config_local.yml \
+#            --input "Your question here"
+# ─────────────────────────────────────────────────────────────────────────────
+
+functions:
+  web_search:
+    _type: openclaw_web_search
+    max_results: 5
+
+  wiki_search:
+    _type: openclaw_wiki_search
+    language: en
+    sentences: 5
+
+  datetime:
+    _type: openclaw_datetime
+
+  system_info:
+    _type: openclaw_system_info
+
+  url_fetch:
+    _type: openclaw_url_fetch
+
+  calculator:
+    _type: openclaw_calculator
+
+  code_runner:
+    _type: openclaw_code_runner
+    timeout_seconds: 10
+    allowed: false
+
+llms:
+  local_llm:
+    _type: openai
+    # Point to your local server — examples:
+    #   Ollama:       http://localhost:11434/v1
+    #   vLLM:         http://localhost:8000/v1
+    #   llama.cpp:    http://localhost:8080/v1
+    base_url: "http://localhost:11434/v1"
+    model_name: "llama3.3"   # must match the model name your server expects
+    temperature: 0.0
+    max_tokens: 2048
+    api_key: "none"           # required field but ignored by most local servers
+
+workflow:
+  _type: tool_calling_agent
+  tool_names:
+    - web_search
+    - wiki_search
+    - datetime
+    - system_info
+    - url_fetch
+    - calculator
+  llm_name: local_llm
+  verbose: true
+  handle_tool_errors: true

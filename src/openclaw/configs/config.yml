@@ -1,0 +1,68 @@
+# OpenClaw — NVIDIA AgentIQ Workflow Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+# Run with:
+#   aiq run --config_file src/openclaw/configs/config.yml \
+#            --input "Your question here"
+#
+# Required environment variable:
+#   NVIDIA_API_KEY — get yours at https://build.nvidia.com
+# ─────────────────────────────────────────────────────────────────────────────
+
+functions:
+  web_search:
+    _type: openclaw_web_search
+    max_results: 5
+    region: wt-wt
+
+  wiki_search:
+    _type: openclaw_wiki_search
+    language: en
+    sentences: 5
+
+  datetime:
+    _type: openclaw_datetime
+    timezone_name: UTC
+
+  system_info:
+    _type: openclaw_system_info
+
+  url_fetch:
+    _type: openclaw_url_fetch
+    timeout_seconds: 15.0
+    max_chars: 4000
+
+  calculator:
+    _type: openclaw_calculator
+
+  # Code runner is disabled by default for safety.
+  # Set allowed: true only in trusted environments.
+  code_runner:
+    _type: openclaw_code_runner
+    timeout_seconds: 10
+    allowed: false
+
+llms:
+  nim_llm:
+    _type: nim
+    # Model served via NVIDIA NIM — swap for any NIM-compatible endpoint.
+    # See available models at: https://build.nvidia.com/explore/discover
+    model_name: meta/llama-3.3-70b-instruct
+    temperature: 0.0
+    max_tokens: 2048
+
+workflow:
+  _type: tool_calling_agent
+  tool_names:
+    - web_search
+    - wiki_search
+    - datetime
+    - system_info
+    - url_fetch
+    - calculator
+    - code_runner
+  llm_name: nim_llm
+  verbose: true
+  handle_tool_errors: true
+
+general:
+  use_uvloop: true
