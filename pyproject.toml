@@ -15,7 +15,11 @@ dependencies = [
     "duckduckgo-search>=6.0",
     "wikipedia-api>=0.6",
     "rich>=13.0",
+    "gradio>=4.40",
 ]
+
+[project.scripts]
+openclaw-ui = "openclaw.app:main"
 
 [project.entry-points.'aiq.components']
 openclaw = "openclaw.register"

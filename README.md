@@ -25,6 +25,25 @@ local model) and equipped with a practical set of built-in tools:
 
 ---
 
+## Web UI
+
+OpenClaw ships a Gradio chat interface that embeds the AgentIQ workflow directly:
+
+```bash
+# NVIDIA NIM (cloud) — default
+openclaw-ui
+
+# Local model (Ollama / vLLM / llama.cpp)
+openclaw-ui --config config_local.yml
+
+# Custom port / public share link
+openclaw-ui --port 8080 --share
+```
+
+Then open **http://localhost:7860** in your browser.
+
+---
+
 ## Quick start
 
 ```bash
