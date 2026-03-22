@@ -35,6 +35,55 @@ functions:
     timeout_seconds: 10
     allowed: false
 
+  # ── Gmail + Google Calendar tools ───────────────────────────────────────────
+  # Requires one-time OAuth2 setup — run: python scripts/google_setup.py
+  #
+  gmail_summary:
+    _type: openclaw_gmail_summary
+    max_unread: 20
+
+  gmail_list:
+    _type: openclaw_gmail_list
+    max_results: 10
+    unread_only: true
+
+  gmail_read:
+    _type: openclaw_gmail_read
+
+  gmail_search:
+    _type: openclaw_gmail_search
+    max_results: 10
+
+  gmail_followup:
+    _type: openclaw_gmail_followup
+    days_threshold: 3
+
+  gmail_mark:
+    _type: openclaw_gmail_mark
+
+  calendar_list:
+    _type: openclaw_calendar_list
+    days: 7
+    max_results: 20
+
+  calendar_search:
+    _type: openclaw_calendar_search
+    days_back: 30
+    days_forward: 60
+
+  calendar_create:
+    _type: openclaw_calendar_create
+
+  calendar_update:
+    _type: openclaw_calendar_update
+
+  calendar_delete:
+    _type: openclaw_calendar_delete
+
+  calendar_free_slots:
+    _type: openclaw_calendar_free_slots
+    duration_minutes: 60
+
 llms:
   local_llm:
     _type: openai
@@ -57,6 +106,18 @@ workflow:
     - system_info
     - url_fetch
     - calculator
+    - gmail_summary
+    - gmail_list
+    - gmail_read
+    - gmail_search
+    - gmail_followup
+    - gmail_mark
+    - calendar_list
+    - calendar_search
+    - calendar_create
+    - calendar_update
+    - calendar_delete
+    - calendar_free_slots
   llm_name: local_llm
   verbose: true
   handle_tool_errors: true

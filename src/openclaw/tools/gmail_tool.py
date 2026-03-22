@@ -6,21 +6,20 @@ and follow-ups like a personal assistant.
 
 Setup:
   1. Go to https://console.cloud.google.com/
-  2. Create a project → enable the Gmail API
+  2. Create a project → enable the Gmail API and Google Calendar API
   3. Create OAuth 2.0 credentials (Desktop app) → download as credentials.json
-  4. Place credentials.json next to this file or set GMAIL_CREDENTIALS_FILE env var
-  5. Run: python -m openclaw.tools.gmail_tool  (first-time auth)
+  4. Save as ~/.openclaw/google_credentials.json
+  5. Run: python scripts/google_setup.py  (first-time auth)
 
 Environment variables:
-  GMAIL_CREDENTIALS_FILE  — path to credentials.json (default: ~/.openclaw/gmail_credentials.json)
-  GMAIL_TOKEN_FILE        — path to store the OAuth token (default: ~/.openclaw/gmail_token.json)
+  GOOGLE_CREDENTIALS_FILE — path to credentials.json
+  GOOGLE_TOKEN_FILE       — where the OAuth token is cached
   GMAIL_USER_ID           — Gmail address to act as (default: "me")
 """
 
 from __future__ import annotations
 
 import base64
-import json
 import os
 import re
 from datetime import datetime, timezone, timedelta
@@ -28,62 +27,12 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Auth helpers
-# ──────────────────────────────────────────────────────────────────────────────
-
-_DEFAULT_CRED_DIR = Path.home() / ".openclaw"
-_SCOPES = [
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/gmail.modify",  # needed for labelling / starring
-]
-
-
-def _credentials_path() -> Path:
-    return Path(os.environ.get("GMAIL_CREDENTIALS_FILE", _DEFAULT_CRED_DIR / "gmail_credentials.json"))
-
-
-def _token_path() -> Path:
-    return Path(os.environ.get("GMAIL_TOKEN_FILE", _DEFAULT_CRED_DIR / "gmail_token.json"))
+from openclaw.tools.google_auth import get_service, token_path as _token_path, credentials_path as _credentials_path
 
 
 def _get_gmail_service():
     """Return an authenticated Gmail API service object, or raise ImportError/FileNotFoundError."""
-    try:
-        from google.oauth2.credentials import Credentials  # type: ignore
-        from google.auth.transport.requests import Request  # type: ignore
-        from google_auth_oauthlib.flow import InstalledAppFlow  # type: ignore
-        from googleapiclient.discovery import build  # type: ignore
-    except ImportError as exc:
-        raise ImportError(
-            "Gmail dependencies not installed. Run: pip install google-api-python-client "
-            "google-auth-oauthlib google-auth-httplib2"
-        ) from exc
-
-    cred_file = _credentials_path()
-    token_file = _token_path()
-    token_file.parent.mkdir(parents=True, exist_ok=True)
-
-    creds = None
-    if token_file.exists():
-        creds = Credentials.from_authorized_user_file(str(token_file), _SCOPES)
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            if not cred_file.exists():
-                raise FileNotFoundError(
-                    f"Gmail credentials file not found at {cred_file}.\n"
-                    "Download OAuth2 credentials from Google Cloud Console and save as:\n"
-                    f"  {cred_file}\n"
-                    "Then re-run the agent (or run: python -m openclaw.tools.gmail_tool)."
-                )
-            flow = InstalledAppFlow.from_client_secrets_file(str(cred_file), _SCOPES)
-            creds = flow.run_local_server(port=0)
-        token_file.write_text(creds.to_json())
-
-    return build("gmail", "v1", credentials=creds)
+    return get_service("gmail", "v1")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -458,11 +407,4 @@ def get_email_summary(max_unread: int = 20) -> str:
 # ──────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print("OpenClaw Gmail Setup — authorising OAuth2 access...")
-    try:
-        svc = _get_gmail_service()
-        profile = svc.users().getProfile(userId="me").execute()
-        print(f"Success! Authenticated as: {profile['emailAddress']}")
-        print(f"Token saved to: {_token_path()}")
-    except Exception as exc:
-        print(f"Setup failed: {exc}")
+    print("Run: python scripts/google_setup.py  to authorise Google access.")

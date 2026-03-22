@@ -622,3 +622,201 @@ async def memory_tool(config: MemoryToolConfig, builder: Builder):
 
     yield FunctionInfo.from_fn(_store, description="Store a fact in persistent memory for future sessions")
     yield FunctionInfo.from_fn(_recall, description="Search persistent memory for facts relevant to a query")
+
+
+# ---------------------------------------------------------------------------
+# Google Calendar tools
+# ---------------------------------------------------------------------------
+
+
+class CalendarListConfig(FunctionBaseConfig, name="openclaw_calendar_list"):
+    days: int = Field(7, ge=1, le=90, description="How many days ahead to look for events")
+    max_results: int = Field(20, ge=1, le=50, description="Maximum number of events to return")
+
+
+@register_function(config_type=CalendarListConfig)
+async def calendar_list_tool(config: CalendarListConfig, builder: Builder):
+    """List upcoming Google Calendar events."""
+
+    async def _list(_: str = "") -> str:
+        """List upcoming calendar events for the next configured number of days.
+
+        Args:
+            _: Ignored (pass any string or leave empty).
+
+        Returns:
+            Formatted list of upcoming events with titles, times, locations, and IDs.
+        """
+        from openclaw.tools.calendar_tool import list_upcoming_events
+        return list_upcoming_events(days=config.days, max_results=config.max_results)
+
+    yield FunctionInfo.from_fn(_list, description=f"List upcoming Google Calendar events (next {config.days} days)")
+
+
+class CalendarSearchConfig(FunctionBaseConfig, name="openclaw_calendar_search"):
+    days_back: int = Field(30, ge=1, le=180, description="Days in the past to search")
+    days_forward: int = Field(60, ge=1, le=365, description="Days in the future to search")
+
+
+@register_function(config_type=CalendarSearchConfig)
+async def calendar_search_tool(config: CalendarSearchConfig, builder: Builder):
+    """Search Google Calendar events by keyword."""
+
+    async def _search(query: str) -> str:
+        """Search calendar events by keyword (title, description, or location).
+
+        Args:
+            query: Text to search for, e.g. 'dentist', 'team standup', 'John'.
+
+        Returns:
+            Matching events with full details including IDs for use with update/delete.
+        """
+        from openclaw.tools.calendar_tool import search_events
+        return search_events(query, days_back=config.days_back, days_forward=config.days_forward)
+
+    yield FunctionInfo.from_fn(_search, description="Search Google Calendar events by keyword")
+
+
+class CalendarCreateConfig(FunctionBaseConfig, name="openclaw_calendar_create"):
+    pass
+
+
+@register_function(config_type=CalendarCreateConfig)
+async def calendar_create_tool(config: CalendarCreateConfig, builder: Builder):
+    """Create a new Google Calendar event."""
+
+    async def _create(request: str) -> str:
+        """Create a new calendar event.
+
+        Provide all event details as a JSON string with these fields:
+          - title (required): event name
+          - start (required): start datetime, e.g. "2024-06-15 14:00" or "2024-06-15T14:00:00"
+          - end (required): end datetime, same format
+          - description (optional): notes or agenda
+          - location (optional): address or room name
+          - attendees (optional): comma-separated emails, e.g. "alice@x.com,bob@x.com"
+
+        For all-day events use date-only format: "2024-06-15"
+
+        Args:
+            request: JSON string with event fields, e.g.:
+                     {"title":"Team lunch","start":"2024-06-15 12:00","end":"2024-06-15 13:00","location":"Cafeteria"}
+
+        Returns:
+            Confirmation with event ID and Google Calendar link.
+        """
+        import json as _json
+        try:
+            params = _json.loads(request)
+        except Exception:
+            return (
+                "Please provide event details as JSON, e.g.:\n"
+                '{"title":"Meeting","start":"2024-06-15 14:00","end":"2024-06-15 15:00"}'
+            )
+        from openclaw.tools.calendar_tool import create_event
+        return create_event(
+            title=params.get("title", ""),
+            start=params.get("start", ""),
+            end=params.get("end", ""),
+            description=params.get("description", ""),
+            location=params.get("location", ""),
+            attendees=params.get("attendees", ""),
+        )
+
+    yield FunctionInfo.from_fn(_create, description="Create a new Google Calendar event")
+
+
+class CalendarUpdateConfig(FunctionBaseConfig, name="openclaw_calendar_update"):
+    pass
+
+
+@register_function(config_type=CalendarUpdateConfig)
+async def calendar_update_tool(config: CalendarUpdateConfig, builder: Builder):
+    """Update an existing Google Calendar event."""
+
+    async def _update(request: str) -> str:
+        """Update an existing calendar event (only fields you provide are changed).
+
+        Provide the event ID and the fields to update as a JSON string:
+          - event_id (required): from calendar_list or calendar_search
+          - title (optional): new title
+          - start (optional): new start datetime
+          - end (optional): new end datetime
+          - description (optional): new notes
+          - location (optional): new location
+
+        Args:
+            request: JSON string, e.g.:
+                     {"event_id":"abc123","title":"Updated title","start":"2024-06-16 14:00"}
+
+        Returns:
+            Confirmation with updated event details.
+        """
+        import json as _json
+        try:
+            params = _json.loads(request)
+        except Exception:
+            return (
+                "Please provide update details as JSON, e.g.:\n"
+                '{"event_id":"abc123","title":"New title"}'
+            )
+        from openclaw.tools.calendar_tool import update_event
+        return update_event(
+            event_id=params.get("event_id", ""),
+            title=params.get("title", ""),
+            start=params.get("start", ""),
+            end=params.get("end", ""),
+            description=params.get("description", ""),
+            location=params.get("location", ""),
+        )
+
+    yield FunctionInfo.from_fn(_update, description="Update an existing Google Calendar event by ID")
+
+
+class CalendarDeleteConfig(FunctionBaseConfig, name="openclaw_calendar_delete"):
+    pass
+
+
+@register_function(config_type=CalendarDeleteConfig)
+async def calendar_delete_tool(config: CalendarDeleteConfig, builder: Builder):
+    """Delete a Google Calendar event by ID."""
+
+    async def _delete(event_id: str) -> str:
+        """Delete a Google Calendar event.
+
+        Args:
+            event_id: The event ID to delete (get it from calendar_list or calendar_search).
+
+        Returns:
+            Confirmation that the event was deleted.
+        """
+        from openclaw.tools.calendar_tool import delete_event
+        return delete_event(event_id)
+
+    yield FunctionInfo.from_fn(_delete, description="Delete a Google Calendar event by ID")
+
+
+class CalendarFreeSlotsConfig(FunctionBaseConfig, name="openclaw_calendar_free_slots"):
+    duration_minutes: int = Field(60, ge=15, le=480, description="Minimum free block size in minutes")
+
+
+@register_function(config_type=CalendarFreeSlotsConfig)
+async def calendar_free_slots_tool(config: CalendarFreeSlotsConfig, builder: Builder):
+    """Find free time slots on a given day for scheduling."""
+
+    async def _free(date_str: str) -> str:
+        """Find free time windows on a given date for scheduling a meeting.
+
+        Checks against existing calendar events and returns gaps during working
+        hours (09:00–18:00 UTC) that are long enough for the configured duration.
+
+        Args:
+            date_str: The date to check in YYYY-MM-DD format, e.g. "2024-06-15".
+
+        Returns:
+            Available free time windows with start and end times.
+        """
+        from openclaw.tools.calendar_tool import get_free_slots
+        return get_free_slots(date_str, duration_minutes=config.duration_minutes)
+
+    yield FunctionInfo.from_fn(_free, description=f"Find free {config.duration_minutes}-min slots on a given day")
