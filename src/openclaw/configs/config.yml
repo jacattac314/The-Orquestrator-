@@ -34,6 +34,20 @@ functions:
   calculator:
     _type: openclaw_calculator
 
+  # Persistent cross-session memory backed by mem0ai.
+  # Requires: pip install mem0ai
+  # Local mode uses NVIDIA_API_KEY for its internal LLM/embedder.
+  # Cloud mode requires MEM0_API_KEY (set provider: cloud).
+  memory_store:
+    _type: openclaw_memory
+    user_id: default
+    provider: local
+
+  memory_recall:
+    _type: openclaw_memory
+    user_id: default
+    provider: local
+
   # Code runner is disabled by default for safety.
   # Set allowed: true only in trusted environments.
   code_runner:
@@ -59,6 +73,8 @@ workflow:
     - system_info
     - url_fetch
     - calculator
+    - memory_store
+    - memory_recall
     - code_runner
   llm_name: nim_llm
   verbose: true

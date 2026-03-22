@@ -18,11 +18,48 @@ dependencies = [
     "gradio>=4.40",
 ]
 
+[project.optional-dependencies]
+memory = ["mem0ai>=0.1"]
+mcp = ["mcp>=1.0"]
+telemetry = [
+    "opentelemetry-sdk>=1.24",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.24",
+    "opentelemetry-exporter-otlp-proto-http>=1.24",
+    "opentelemetry-instrumentation-langchain>=0.1",
+]
+phoenix = ["openclaw[telemetry]", "arize-phoenix-otel>=0.6"]
+langfuse = ["openclaw[telemetry]", "langfuse>=3.0"]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "respx>=0.21",
+    "ruff>=0.4",
+]
+all = [
+    "openclaw[memory]",
+    "openclaw[mcp]",
+    "openclaw[telemetry]",
+    "openclaw[dev]",
+]
+
 [project.scripts]
 openclaw-ui = "openclaw.app:main"
+openclaw-mcp = "openclaw.mcp_server:main"
 
 [project.entry-points.'aiq.components']
 openclaw = "openclaw.register"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]

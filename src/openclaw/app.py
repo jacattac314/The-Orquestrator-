@@ -22,6 +22,8 @@ from typing import Generator
 
 import gradio as gr
 
+from openclaw.telemetry import setup_telemetry
+
 logger = logging.getLogger(__name__)
 
 CONFIGS_DIR = Path(__file__).parent / "configs"
@@ -247,6 +249,11 @@ def main() -> None:
         level=logging.INFO,
         format="%(asctime)s  %(levelname)-7s  %(name)s — %(message)s",
     )
+
+    # Start telemetry (no-op if env vars not set)
+    backend = setup_telemetry()
+    if backend != "disabled":
+        print(f"📊  Telemetry active → {backend}")
 
     # Start the background event loop
     thread = threading.Thread(target=_run_event_loop, daemon=True)

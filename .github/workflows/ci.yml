@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "claude/**"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test:
+    name: Lint & Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint with ruff
+        run: ruff check src/ tests/
+
+      - name: Run tests
+        env:
+          # Dummy key so tools that read env vars don't error at import time
+          NVIDIA_API_KEY: nvapi-ci-dummy-key
+        run: |
+          pytest tests/ -v --tb=short -x \
+            --ignore=tests/test_tools.py  # network/LLM tools; run separately
+
+      - name: Run tool unit tests (no network)
+        env:
+          NVIDIA_API_KEY: nvapi-ci-dummy-key
+        run: |
+          pytest tests/test_tools.py -v --tb=short \
+            -k "not url_fetch_success and not url_fetch_http_error"
+
+  # Optional job: run integration tests only when NVIDIA_API_KEY is available
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: integration  # gate on a GitHub Environment that has the secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run full test suite
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+        run: pytest tests/ -v --tb=short

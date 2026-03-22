@@ -349,3 +349,123 @@ async def calculator_tool(config: CalculatorConfig, builder: Builder):
             return f"Cannot evaluate {expression!r}: {exc}"
 
     yield FunctionInfo.from_fn(_calculate, description="Evaluate a mathematical expression safely")
+
+
+# ---------------------------------------------------------------------------
+# Tool: memory  (mem0ai — persistent cross-session facts)
+# ---------------------------------------------------------------------------
+
+
+class MemoryToolConfig(FunctionBaseConfig, name="openclaw_memory"):
+    user_id: str = Field("default", description="Identifier scoping the memory namespace")
+    provider: str = Field(
+        "local",
+        description="'local' (on-disk via mem0) or 'cloud' (mem0 SaaS, requires MEM0_API_KEY)",
+    )
+    nim_base_url: str = Field(
+        "https://integrate.api.nvidia.com/v1",
+        description="Base URL for the NIM-compatible LLM used by mem0 local mode",
+    )
+    nim_model: str = Field(
+        "meta/llama-3.3-70b-instruct",
+        description="Model name for the NIM LLM used internally by mem0",
+    )
+    embedder_model: str = Field(
+        "nvidia/nv-embedqa-e5-v5",
+        description="Embedding model served by the same NIM endpoint",
+    )
+
+
+@register_function(config_type=MemoryToolConfig)
+async def memory_tool(config: MemoryToolConfig, builder: Builder):
+    """Persistent memory store backed by mem0ai.
+
+    Provides two operations: store a fact and recall relevant memories.
+    """
+
+    def _make_memory():
+        try:
+            if config.provider == "cloud":
+                from mem0 import MemoryClient  # type: ignore
+
+                api_key = os.environ.get("MEM0_API_KEY", "")
+                if not api_key:
+                    return None, "MEM0_API_KEY environment variable is not set"
+                return MemoryClient(api_key=api_key), None
+            else:
+                from mem0 import Memory  # type: ignore
+
+                nim_api_key = os.environ.get("NVIDIA_API_KEY", "")
+                mem_config = {
+                    "llm": {
+                        "provider": "openai",
+                        "config": {
+                            "model": config.nim_model,
+                            "api_key": nim_api_key,
+                            "openai_base_url": config.nim_base_url,
+                        },
+                    },
+                    "embedder": {
+                        "provider": "openai",
+                        "config": {
+                            "model": config.embedder_model,
+                            "api_key": nim_api_key,
+                            "openai_base_url": config.nim_base_url,
+                        },
+                    },
+                }
+                return Memory.from_config(mem_config), None
+        except ImportError:
+            return None, "mem0ai is not installed. Run: pip install mem0ai"
+        except Exception as exc:  # noqa: BLE001
+            return None, f"mem0 init failed: {exc}"
+
+    _mem, _mem_error = _make_memory()
+
+    async def _store(fact: str) -> str:
+        """Store a fact or piece of information in persistent memory.
+
+        Use this to remember important things the user tells you across sessions.
+
+        Args:
+            fact: A short statement or fact to remember, e.g. 'User prefers metric units'.
+
+        Returns:
+            Confirmation that the memory was stored.
+        """
+        if _mem is None:
+            return f"Memory unavailable: {_mem_error}"
+        try:
+            _mem.add(fact, user_id=config.user_id)
+            return f"Stored: {fact!r}"
+        except Exception as exc:  # noqa: BLE001
+            return f"Failed to store memory: {exc}"
+
+    async def _recall(query: str) -> str:
+        """Search persistent memory for facts relevant to the query.
+
+        Call this at the start of a conversation to recall what you know about the user.
+
+        Args:
+            query: A natural-language question or topic to search for.
+
+        Returns:
+            Relevant memories as a formatted list, or a message if none found.
+        """
+        if _mem is None:
+            return f"Memory unavailable: {_mem_error}"
+        try:
+            results = _mem.search(query, user_id=config.user_id)
+            if not results:
+                return "No relevant memories found."
+            # mem0 returns list of dicts with 'memory' key
+            lines = ["Relevant memories:"]
+            for i, r in enumerate(results, 1):
+                text = r.get("memory", r) if isinstance(r, dict) else str(r)
+                lines.append(f"  {i}. {text}")
+            return "\n".join(lines)
+        except Exception as exc:  # noqa: BLE001
+            return f"Failed to search memory: {exc}"
+
+    yield FunctionInfo.from_fn(_store, description="Store a fact in persistent memory for future sessions")
+    yield FunctionInfo.from_fn(_recall, description="Search persistent memory for facts relevant to a query")
