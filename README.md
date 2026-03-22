@@ -14,6 +14,12 @@ local model) and equipped with a practical set of built-in tools:
 | `url_fetch` | Retrieve text content from any URL |
 | `calculator` | Safe arithmetic (sin, cos, sqrt, log…) |
 | `code_runner` | Execute Python snippets *(disabled by default)* |
+| `gmail_summary` | Personal-assistant inbox briefing (unread count, senders, follow-ups) |
+| `gmail_list` | List recent inbox messages |
+| `gmail_read` | Read a full email by ID |
+| `gmail_search` | Search Gmail with any search operator |
+| `gmail_followup` | Find sent emails with no reply after N days |
+| `gmail_mark` | Star an email to flag it for follow-up |
 
 ---
 
@@ -116,6 +122,45 @@ workflow.yml
 Each tool is a Python `async` generator decorated with `@register_function` and
 backed by a Pydantic config class. The AgentIQ CLI discovers them automatically
 via the `aiq.components` Python entry point declared in `pyproject.toml`.
+
+---
+
+## Gmail — personal email assistant
+
+OpenClaw can track your Gmail inbox and follow-ups like a personal assistant.
+
+### Setup (one-time)
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) and create a project
+2. **APIs & Services → Enable APIs** — search and enable **Gmail API**
+3. **APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID**
+   - Application type: **Desktop app** → download the JSON file
+4. Save it as `~/.openclaw/gmail_credentials.json`
+   *(or set `GMAIL_CREDENTIALS_FILE` env var to a custom path)*
+5. Install the Gmail extras and run the auth helper:
+
+```bash
+pip install -e ".[gmail]"
+python scripts/gmail_setup.py   # opens browser for one-time OAuth consent
+```
+
+### Usage
+
+Once authenticated the agent can answer questions like:
+
+- *"Give me my inbox briefing"* → `gmail_summary`
+- *"What emails haven't I replied to in 3 days?"* → `gmail_followup`
+- *"Search for emails from alice@example.com about the Q1 report"* → `gmail_search`
+- *"Read email ID 18e4abc123"* → `gmail_read`
+- *"Mark that email for follow-up"* → `gmail_mark`
+
+### Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `GMAIL_CREDENTIALS_FILE` | `~/.openclaw/gmail_credentials.json` | Path to OAuth2 credentials |
+| `GMAIL_TOKEN_FILE` | `~/.openclaw/gmail_token.json` | Where the auth token is cached |
+| `GMAIL_USER_ID` | `me` | Gmail address to act as |
 
 ---
 

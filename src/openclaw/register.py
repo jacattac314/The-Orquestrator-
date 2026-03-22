@@ -352,6 +352,159 @@ async def calculator_tool(config: CalculatorConfig, builder: Builder):
 
 
 # ---------------------------------------------------------------------------
+# Gmail email-tracking tools
+# ---------------------------------------------------------------------------
+
+
+class GmailListConfig(FunctionBaseConfig, name="openclaw_gmail_list"):
+    max_results: int = Field(10, ge=1, le=50, description="Maximum number of messages to return")
+    unread_only: bool = Field(True, description="Return only unread messages when True")
+
+
+@register_function(config_type=GmailListConfig)
+async def gmail_list_tool(config: GmailListConfig, builder: Builder):
+    """List recent Gmail inbox messages."""
+
+    async def _list(_: str = "") -> str:
+        """List recent inbox emails.
+
+        Args:
+            _: Ignored (pass any string or leave empty).
+
+        Returns:
+            A formatted list of recent inbox messages with IDs, senders, subjects, and snippets.
+        """
+        from openclaw.tools.gmail_tool import list_inbox_emails
+        return list_inbox_emails(max_results=config.max_results, unread_only=config.unread_only)
+
+    yield FunctionInfo.from_fn(_list, description="List recent Gmail inbox messages (unread by default)")
+
+
+class GmailReadConfig(FunctionBaseConfig, name="openclaw_gmail_read"):
+    pass
+
+
+@register_function(config_type=GmailReadConfig)
+async def gmail_read_tool(config: GmailReadConfig, builder: Builder):
+    """Read the full content of a Gmail message by ID."""
+
+    async def _read(message_id: str) -> str:
+        """Read the full content of a Gmail email.
+
+        Args:
+            message_id: The Gmail message ID (obtain from gmail_list or gmail_search).
+
+        Returns:
+            Full email headers and body text.
+        """
+        from openclaw.tools.gmail_tool import read_email
+        return read_email(message_id)
+
+    yield FunctionInfo.from_fn(_read, description="Read a Gmail email by its message ID")
+
+
+class GmailSearchConfig(FunctionBaseConfig, name="openclaw_gmail_search"):
+    max_results: int = Field(10, ge=1, le=50, description="Maximum number of results")
+
+
+@register_function(config_type=GmailSearchConfig)
+async def gmail_search_tool(config: GmailSearchConfig, builder: Builder):
+    """Search Gmail using Gmail search operators."""
+
+    async def _search(query: str) -> str:
+        """Search Gmail for messages matching a query.
+
+        Supports all Gmail search operators such as from:, to:, subject:,
+        has:attachment, is:unread, after:, before:, etc.
+
+        Args:
+            query: Gmail search query string, e.g. 'from:boss subject:budget is:unread'.
+
+        Returns:
+            Formatted list of matching messages with IDs, senders, subjects, and snippets.
+        """
+        from openclaw.tools.gmail_tool import search_emails
+        return search_emails(query, max_results=config.max_results)
+
+    yield FunctionInfo.from_fn(_search, description="Search Gmail with any Gmail search operator")
+
+
+class GmailFollowupConfig(FunctionBaseConfig, name="openclaw_gmail_followup"):
+    days_threshold: int = Field(
+        3, ge=1, le=30,
+        description="Flag sent emails with no reply after this many days"
+    )
+
+
+@register_function(config_type=GmailFollowupConfig)
+async def gmail_followup_tool(config: GmailFollowupConfig, builder: Builder):
+    """Find sent emails that have received no reply after N days."""
+
+    async def _check(_: str = "") -> str:
+        """Check for sent emails that have received no reply and may need follow-up.
+
+        Args:
+            _: Ignored (pass any string or leave empty).
+
+        Returns:
+            List of unreplied sent emails older than the configured threshold, sorted by age.
+        """
+        from openclaw.tools.gmail_tool import check_followups
+        return check_followups(days_threshold=config.days_threshold)
+
+    yield FunctionInfo.from_fn(_check, description=f"Find sent emails with no reply after {config.days_threshold} days")
+
+
+class GmailMarkConfig(FunctionBaseConfig, name="openclaw_gmail_mark"):
+    pass
+
+
+@register_function(config_type=GmailMarkConfig)
+async def gmail_mark_tool(config: GmailMarkConfig, builder: Builder):
+    """Star a Gmail message to mark it for follow-up."""
+
+    async def _mark(message_id: str) -> str:
+        """Star a Gmail email to flag it for follow-up.
+
+        Args:
+            message_id: The Gmail message ID to star.
+
+        Returns:
+            Confirmation that the email was starred.
+        """
+        from openclaw.tools.gmail_tool import mark_as_followup
+        return mark_as_followup(message_id)
+
+    yield FunctionInfo.from_fn(_mark, description="Star a Gmail message to mark it for follow-up")
+
+
+class GmailSummaryConfig(FunctionBaseConfig, name="openclaw_gmail_summary"):
+    max_unread: int = Field(20, ge=1, le=50, description="How many unread messages to include in the briefing")
+
+
+@register_function(config_type=GmailSummaryConfig)
+async def gmail_summary_tool(config: GmailSummaryConfig, builder: Builder):
+    """Get a personal-assistant inbox briefing from Gmail."""
+
+    async def _summary(_: str = "") -> str:
+        """Get a concise personal-assistant-style inbox briefing.
+
+        Includes unread count, recent senders, starred items, and follow-up alerts.
+
+        Args:
+            _: Ignored (pass any string or leave empty).
+
+        Returns:
+            A formatted inbox briefing with unread count, recent messages,
+            starred emails, and a follow-up pending count.
+        """
+        from openclaw.tools.gmail_tool import get_email_summary
+        return get_email_summary(max_unread=config.max_unread)
+
+    yield FunctionInfo.from_fn(_summary, description="Get a personal-assistant inbox briefing from Gmail")
+
+
+# ---------------------------------------------------------------------------
 # Tool: memory  (mem0ai — persistent cross-session facts)
 # ---------------------------------------------------------------------------
 

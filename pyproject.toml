@@ -20,6 +20,11 @@ dependencies = [
 
 [project.optional-dependencies]
 memory = ["mem0ai>=0.1"]
+gmail = [
+    "google-api-python-client>=2.100",
+    "google-auth-oauthlib>=1.0",
+    "google-auth-httplib2>=0.2",
+]
 mcp = ["mcp>=1.0"]
 telemetry = [
     "opentelemetry-sdk>=1.24",
@@ -37,6 +42,7 @@ dev = [
 ]
 all = [
     "openclaw[memory]",
+    "openclaw[gmail]",
     "openclaw[mcp]",
     "openclaw[telemetry]",
     "openclaw[dev]",

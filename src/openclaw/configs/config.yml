@@ -55,6 +55,34 @@ functions:
     timeout_seconds: 10
     allowed: false
 
+  # ── Gmail email-tracking tools ──────────────────────────────────────────────
+  # Requires OAuth2 setup — run: python -m openclaw.tools.gmail_tool
+  # Place gmail_credentials.json at ~/.openclaw/gmail_credentials.json
+  # (or set GMAIL_CREDENTIALS_FILE env var to a custom path).
+  #
+  gmail_summary:
+    _type: openclaw_gmail_summary
+    max_unread: 20           # messages scanned for the inbox briefing
+
+  gmail_list:
+    _type: openclaw_gmail_list
+    max_results: 10
+    unread_only: true
+
+  gmail_read:
+    _type: openclaw_gmail_read
+
+  gmail_search:
+    _type: openclaw_gmail_search
+    max_results: 10
+
+  gmail_followup:
+    _type: openclaw_gmail_followup
+    days_threshold: 3        # flag sent emails with no reply after 3 days
+
+  gmail_mark:
+    _type: openclaw_gmail_mark
+
 llms:
   nim_llm:
     _type: nim
@@ -76,6 +104,12 @@ workflow:
     - memory_store
     - memory_recall
     - code_runner
+    - gmail_summary
+    - gmail_list
+    - gmail_read
+    - gmail_search
+    - gmail_followup
+    - gmail_mark
   llm_name: nim_llm
   verbose: true
   handle_tool_errors: true
