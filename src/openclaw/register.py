@@ -352,6 +352,159 @@ async def calculator_tool(config: CalculatorConfig, builder: Builder):
 
 
 # ---------------------------------------------------------------------------
+# Gmail email-tracking tools
+# ---------------------------------------------------------------------------
+
+
+class GmailListConfig(FunctionBaseConfig, name="openclaw_gmail_list"):
+    max_results: int = Field(10, ge=1, le=50, description="Maximum number of messages to return")
+    unread_only: bool = Field(True, description="Return only unread messages when True")
+
+
+@register_function(config_type=GmailListConfig)
+async def gmail_list_tool(config: GmailListConfig, builder: Builder):
+    """List recent Gmail inbox messages."""
+
+    async def _list(_: str = "") -> str:
+        """List recent inbox emails.
+
+        Args:
+            _: Ignored (pass any string or leave empty).
+
+        Returns:
+            A formatted list of recent inbox messages with IDs, senders, subjects, and snippets.
+        """
+        from openclaw.tools.gmail_tool import list_inbox_emails
+        return list_inbox_emails(max_results=config.max_results, unread_only=config.unread_only)
+
+    yield FunctionInfo.from_fn(_list, description="List recent Gmail inbox messages (unread by default)")
+
+
+class GmailReadConfig(FunctionBaseConfig, name="openclaw_gmail_read"):
+    pass
+
+
+@register_function(config_type=GmailReadConfig)
+async def gmail_read_tool(config: GmailReadConfig, builder: Builder):
+    """Read the full content of a Gmail message by ID."""
+
+    async def _read(message_id: str) -> str:
+        """Read the full content of a Gmail email.
+
+        Args:
+            message_id: The Gmail message ID (obtain from gmail_list or gmail_search).
+
+        Returns:
+            Full email headers and body text.
+        """
+        from openclaw.tools.gmail_tool import read_email
+        return read_email(message_id)
+
+    yield FunctionInfo.from_fn(_read, description="Read a Gmail email by its message ID")
+
+
+class GmailSearchConfig(FunctionBaseConfig, name="openclaw_gmail_search"):
+    max_results: int = Field(10, ge=1, le=50, description="Maximum number of results")
+
+
+@register_function(config_type=GmailSearchConfig)
+async def gmail_search_tool(config: GmailSearchConfig, builder: Builder):
+    """Search Gmail using Gmail search operators."""
+
+    async def _search(query: str) -> str:
+        """Search Gmail for messages matching a query.
+
+        Supports all Gmail search operators such as from:, to:, subject:,
+        has:attachment, is:unread, after:, before:, etc.
+
+        Args:
+            query: Gmail search query string, e.g. 'from:boss subject:budget is:unread'.
+
+        Returns:
+            Formatted list of matching messages with IDs, senders, subjects, and snippets.
+        """
+        from openclaw.tools.gmail_tool import search_emails
+        return search_emails(query, max_results=config.max_results)
+
+    yield FunctionInfo.from_fn(_search, description="Search Gmail with any Gmail search operator")
+
+
+class GmailFollowupConfig(FunctionBaseConfig, name="openclaw_gmail_followup"):
+    days_threshold: int = Field(
+        3, ge=1, le=30,
+        description="Flag sent emails with no reply after this many days"
+    )
+
+
+@register_function(config_type=GmailFollowupConfig)
+async def gmail_followup_tool(config: GmailFollowupConfig, builder: Builder):
+    """Find sent emails that have received no reply after N days."""
+
+    async def _check(_: str = "") -> str:
+        """Check for sent emails that have received no reply and may need follow-up.
+
+        Args:
+            _: Ignored (pass any string or leave empty).
+
+        Returns:
+            List of unreplied sent emails older than the configured threshold, sorted by age.
+        """
+        from openclaw.tools.gmail_tool import check_followups
+        return check_followups(days_threshold=config.days_threshold)
+
+    yield FunctionInfo.from_fn(_check, description=f"Find sent emails with no reply after {config.days_threshold} days")
+
+
+class GmailMarkConfig(FunctionBaseConfig, name="openclaw_gmail_mark"):
+    pass
+
+
+@register_function(config_type=GmailMarkConfig)
+async def gmail_mark_tool(config: GmailMarkConfig, builder: Builder):
+    """Star a Gmail message to mark it for follow-up."""
+
+    async def _mark(message_id: str) -> str:
+        """Star a Gmail email to flag it for follow-up.
+
+        Args:
+            message_id: The Gmail message ID to star.
+
+        Returns:
+            Confirmation that the email was starred.
+        """
+        from openclaw.tools.gmail_tool import mark_as_followup
+        return mark_as_followup(message_id)
+
+    yield FunctionInfo.from_fn(_mark, description="Star a Gmail message to mark it for follow-up")
+
+
+class GmailSummaryConfig(FunctionBaseConfig, name="openclaw_gmail_summary"):
+    max_unread: int = Field(20, ge=1, le=50, description="How many unread messages to include in the briefing")
+
+
+@register_function(config_type=GmailSummaryConfig)
+async def gmail_summary_tool(config: GmailSummaryConfig, builder: Builder):
+    """Get a personal-assistant inbox briefing from Gmail."""
+
+    async def _summary(_: str = "") -> str:
+        """Get a concise personal-assistant-style inbox briefing.
+
+        Includes unread count, recent senders, starred items, and follow-up alerts.
+
+        Args:
+            _: Ignored (pass any string or leave empty).
+
+        Returns:
+            A formatted inbox briefing with unread count, recent messages,
+            starred emails, and a follow-up pending count.
+        """
+        from openclaw.tools.gmail_tool import get_email_summary
+        return get_email_summary(max_unread=config.max_unread)
+
+    yield FunctionInfo.from_fn(_summary, description="Get a personal-assistant inbox briefing from Gmail")
+
+
+# ---------------------------------------------------------------------------
 # Tool: memory  (mem0ai — persistent cross-session facts)
 # ---------------------------------------------------------------------------
 
@@ -469,3 +622,201 @@ async def memory_tool(config: MemoryToolConfig, builder: Builder):
 
     yield FunctionInfo.from_fn(_store, description="Store a fact in persistent memory for future sessions")
     yield FunctionInfo.from_fn(_recall, description="Search persistent memory for facts relevant to a query")
+
+
+# ---------------------------------------------------------------------------
+# Google Calendar tools
+# ---------------------------------------------------------------------------
+
+
+class CalendarListConfig(FunctionBaseConfig, name="openclaw_calendar_list"):
+    days: int = Field(7, ge=1, le=90, description="How many days ahead to look for events")
+    max_results: int = Field(20, ge=1, le=50, description="Maximum number of events to return")
+
+
+@register_function(config_type=CalendarListConfig)
+async def calendar_list_tool(config: CalendarListConfig, builder: Builder):
+    """List upcoming Google Calendar events."""
+
+    async def _list(_: str = "") -> str:
+        """List upcoming calendar events for the next configured number of days.
+
+        Args:
+            _: Ignored (pass any string or leave empty).
+
+        Returns:
+            Formatted list of upcoming events with titles, times, locations, and IDs.
+        """
+        from openclaw.tools.calendar_tool import list_upcoming_events
+        return list_upcoming_events(days=config.days, max_results=config.max_results)
+
+    yield FunctionInfo.from_fn(_list, description=f"List upcoming Google Calendar events (next {config.days} days)")
+
+
+class CalendarSearchConfig(FunctionBaseConfig, name="openclaw_calendar_search"):
+    days_back: int = Field(30, ge=1, le=180, description="Days in the past to search")
+    days_forward: int = Field(60, ge=1, le=365, description="Days in the future to search")
+
+
+@register_function(config_type=CalendarSearchConfig)
+async def calendar_search_tool(config: CalendarSearchConfig, builder: Builder):
+    """Search Google Calendar events by keyword."""
+
+    async def _search(query: str) -> str:
+        """Search calendar events by keyword (title, description, or location).
+
+        Args:
+            query: Text to search for, e.g. 'dentist', 'team standup', 'John'.
+
+        Returns:
+            Matching events with full details including IDs for use with update/delete.
+        """
+        from openclaw.tools.calendar_tool import search_events
+        return search_events(query, days_back=config.days_back, days_forward=config.days_forward)
+
+    yield FunctionInfo.from_fn(_search, description="Search Google Calendar events by keyword")
+
+
+class CalendarCreateConfig(FunctionBaseConfig, name="openclaw_calendar_create"):
+    pass
+
+
+@register_function(config_type=CalendarCreateConfig)
+async def calendar_create_tool(config: CalendarCreateConfig, builder: Builder):
+    """Create a new Google Calendar event."""
+
+    async def _create(request: str) -> str:
+        """Create a new calendar event.
+
+        Provide all event details as a JSON string with these fields:
+          - title (required): event name
+          - start (required): start datetime, e.g. "2024-06-15 14:00" or "2024-06-15T14:00:00"
+          - end (required): end datetime, same format
+          - description (optional): notes or agenda
+          - location (optional): address or room name
+          - attendees (optional): comma-separated emails, e.g. "alice@x.com,bob@x.com"
+
+        For all-day events use date-only format: "2024-06-15"
+
+        Args:
+            request: JSON string with event fields, e.g.:
+                     {"title":"Team lunch","start":"2024-06-15 12:00","end":"2024-06-15 13:00","location":"Cafeteria"}
+
+        Returns:
+            Confirmation with event ID and Google Calendar link.
+        """
+        import json as _json
+        try:
+            params = _json.loads(request)
+        except Exception:
+            return (
+                "Please provide event details as JSON, e.g.:\n"
+                '{"title":"Meeting","start":"2024-06-15 14:00","end":"2024-06-15 15:00"}'
+            )
+        from openclaw.tools.calendar_tool import create_event
+        return create_event(
+            title=params.get("title", ""),
+            start=params.get("start", ""),
+            end=params.get("end", ""),
+            description=params.get("description", ""),
+            location=params.get("location", ""),
+            attendees=params.get("attendees", ""),
+        )
+
+    yield FunctionInfo.from_fn(_create, description="Create a new Google Calendar event")
+
+
+class CalendarUpdateConfig(FunctionBaseConfig, name="openclaw_calendar_update"):
+    pass
+
+
+@register_function(config_type=CalendarUpdateConfig)
+async def calendar_update_tool(config: CalendarUpdateConfig, builder: Builder):
+    """Update an existing Google Calendar event."""
+
+    async def _update(request: str) -> str:
+        """Update an existing calendar event (only fields you provide are changed).
+
+        Provide the event ID and the fields to update as a JSON string:
+          - event_id (required): from calendar_list or calendar_search
+          - title (optional): new title
+          - start (optional): new start datetime
+          - end (optional): new end datetime
+          - description (optional): new notes
+          - location (optional): new location
+
+        Args:
+            request: JSON string, e.g.:
+                     {"event_id":"abc123","title":"Updated title","start":"2024-06-16 14:00"}
+
+        Returns:
+            Confirmation with updated event details.
+        """
+        import json as _json
+        try:
+            params = _json.loads(request)
+        except Exception:
+            return (
+                "Please provide update details as JSON, e.g.:\n"
+                '{"event_id":"abc123","title":"New title"}'
+            )
+        from openclaw.tools.calendar_tool import update_event
+        return update_event(
+            event_id=params.get("event_id", ""),
+            title=params.get("title", ""),
+            start=params.get("start", ""),
+            end=params.get("end", ""),
+            description=params.get("description", ""),
+            location=params.get("location", ""),
+        )
+
+    yield FunctionInfo.from_fn(_update, description="Update an existing Google Calendar event by ID")
+
+
+class CalendarDeleteConfig(FunctionBaseConfig, name="openclaw_calendar_delete"):
+    pass
+
+
+@register_function(config_type=CalendarDeleteConfig)
+async def calendar_delete_tool(config: CalendarDeleteConfig, builder: Builder):
+    """Delete a Google Calendar event by ID."""
+
+    async def _delete(event_id: str) -> str:
+        """Delete a Google Calendar event.
+
+        Args:
+            event_id: The event ID to delete (get it from calendar_list or calendar_search).
+
+        Returns:
+            Confirmation that the event was deleted.
+        """
+        from openclaw.tools.calendar_tool import delete_event
+        return delete_event(event_id)
+
+    yield FunctionInfo.from_fn(_delete, description="Delete a Google Calendar event by ID")
+
+
+class CalendarFreeSlotsConfig(FunctionBaseConfig, name="openclaw_calendar_free_slots"):
+    duration_minutes: int = Field(60, ge=15, le=480, description="Minimum free block size in minutes")
+
+
+@register_function(config_type=CalendarFreeSlotsConfig)
+async def calendar_free_slots_tool(config: CalendarFreeSlotsConfig, builder: Builder):
+    """Find free time slots on a given day for scheduling."""
+
+    async def _free(date_str: str) -> str:
+        """Find free time windows on a given date for scheduling a meeting.
+
+        Checks against existing calendar events and returns gaps during working
+        hours (09:00–18:00 UTC) that are long enough for the configured duration.
+
+        Args:
+            date_str: The date to check in YYYY-MM-DD format, e.g. "2024-06-15".
+
+        Returns:
+            Available free time windows with start and end times.
+        """
+        from openclaw.tools.calendar_tool import get_free_slots
+        return get_free_slots(date_str, duration_minutes=config.duration_minutes)
+
+    yield FunctionInfo.from_fn(_free, description=f"Find free {config.duration_minutes}-min slots on a given day")

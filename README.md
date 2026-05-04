@@ -14,6 +14,18 @@ local model) and equipped with a practical set of built-in tools:
 | `url_fetch` | Retrieve text content from any URL |
 | `calculator` | Safe arithmetic (sin, cos, sqrt, log…) |
 | `code_runner` | Execute Python snippets *(disabled by default)* |
+| `gmail_summary` | Personal-assistant inbox briefing (unread count, senders, follow-ups) |
+| `gmail_list` | List recent inbox messages |
+| `gmail_read` | Read a full email by ID |
+| `gmail_search` | Search Gmail with any search operator |
+| `gmail_followup` | Find sent emails with no reply after N days |
+| `gmail_mark` | Star an email to flag it for follow-up |
+| `calendar_list` | List upcoming Google Calendar events |
+| `calendar_search` | Search events by keyword |
+| `calendar_create` | Create a new calendar event |
+| `calendar_update` | Update an existing event |
+| `calendar_delete` | Delete an event |
+| `calendar_free_slots` | Find free time slots on a given day |
 
 ---
 
@@ -116,6 +128,56 @@ workflow.yml
 Each tool is a Python `async` generator decorated with `@register_function` and
 backed by a Pydantic config class. The AgentIQ CLI discovers them automatically
 via the `aiq.components` Python entry point declared in `pyproject.toml`.
+
+---
+
+## Gmail + Google Calendar — personal assistant
+
+OpenClaw connects to your Gmail and Google Calendar to act as a personal assistant.
+A single OAuth2 authorisation covers both services.
+
+### Setup (one-time)
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) and create a project
+2. **APIs & Services → Enable APIs** — enable both:
+   - **Gmail API**
+   - **Google Calendar API**
+3. **APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID**
+   - Application type: **Desktop app** → download the JSON file
+4. Save it as `~/.openclaw/google_credentials.json`
+   *(or set `GOOGLE_CREDENTIALS_FILE` env var to a custom path)*
+5. Install dependencies and run the auth helper:
+
+```bash
+pip install -e ".[gmail]"
+python scripts/google_setup.py   # opens browser for one-time OAuth consent
+```
+
+### Gmail usage
+
+- *"Give me my inbox briefing"* → `gmail_summary`
+- *"What emails haven't I replied to in 3 days?"* → `gmail_followup`
+- *"Search for emails from alice@example.com about the Q1 report"* → `gmail_search`
+- *"Read email ID 18e4abc123"* → `gmail_read`
+- *"Star that email so I follow up"* → `gmail_mark`
+
+### Calendar usage
+
+- *"What's on my calendar this week?"* → `calendar_list`
+- *"Schedule a team lunch on Friday at noon for 1 hour"* → `calendar_create`
+- *"Find my dentist appointment"* → `calendar_search`
+- *"Move that meeting to 3 PM"* → `calendar_update`
+- *"What free slots do I have tomorrow for a 1-hour call?"* → `calendar_free_slots`
+- *"Delete the cancelled meeting"* → `calendar_delete`
+
+### Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `GOOGLE_CREDENTIALS_FILE` | `~/.openclaw/google_credentials.json` | Path to OAuth2 credentials |
+| `GOOGLE_TOKEN_FILE` | `~/.openclaw/google_token.json` | Where the auth token is cached |
+| `GMAIL_USER_ID` | `me` | Gmail address to act as |
+| `GOOGLE_CALENDAR_ID` | `primary` | Calendar to read/write |
 
 ---
 
